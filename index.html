@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Aurora Map - Modular</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- External CSS for Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Your custom CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="aurora-status-banner">
+    <!-- Content populated by JS -->
+  </div> 
+
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="touch-interaction-message">Use two fingers to zoom/pan the map smoothly or one finger to drag.</div>
+    <div id="logo-container">
+      <a href="https://www.tnrprotography.co.nz/" target="_blank" rel="noopener noreferrer">
+        <img src="https://www.tnrprotography.co.nz/uploads/1/3/6/6/136682089/published/black-tnr-protography-w.png?1739261235" alt="TNR Protography Logo">
+      </a>
+    </div>
+    <div id="loading-indicator">Loading Data...</div>
+  </div>
+
+  <div id="info-bottom-panel">
+    <div id="info-panel-header">
+        <div id="info-panel-title">Information</div>
+        <button id="info-panel-close-button">&times;</button>
+    </div>
+    <div id="info-panel-content"></div>
+  </div>
+
+  <!-- External JS for Leaflet -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <!-- Your custom JavaScript -->
+  <script src="script.js"></script>
+</body>
+</html>
