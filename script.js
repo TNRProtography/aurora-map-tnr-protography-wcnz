@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     new InfoControl().addTo(map);
 
-    // --- MODIFIED: RefreshControl Definition ---
+    // --- RefreshControl Definition (Icon Button) ---
     const RefreshControl = L.Control.extend({
         options: {
             position: 'topright'
@@ -103,11 +103,13 @@ document.addEventListener('DOMContentLoaded', function() {
             container.style.textAlign = 'center';
             this._map = mapCtrl;
 
-            this.refreshButton = L.DomUtil.create('button', 'refresh-button', container);
-            this.refreshButton.innerHTML = '↻ Refresh';
+            this.refreshButton = L.DomUtil.create('button', 'refresh-button-icon', container);
+            this.refreshButton.innerHTML = '↻'; // Unicode for refresh symbol
             this.refreshButton.style.backgroundColor = '#fff';
             this.refreshButton.style.border = '1px solid #ccc';
-            this.refreshButton.style.padding = '5px 8px';
+            this.refreshButton.style.padding = '2px 6px'; // Adjusted padding
+            this.refreshButton.style.fontSize = '1.3em';   // Icon size
+            this.refreshButton.style.lineHeight = '1';    // Icon alignment
             this.refreshButton.style.cursor = 'pointer';
             this.refreshButton.style.borderRadius = '3px';
             this.refreshButton.style.outline = 'none';
@@ -115,10 +117,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             this.lastUpdatedTextElement = L.DomUtil.create('div', 'last-updated-text', container);
             this.lastUpdatedTextElement.style.fontSize = '10px';
-            this.lastUpdatedTextElement.style.marginTop = '3px';
+            this.lastUpdatedTextElement.style.marginTop = '4px'; // Spacing
             this.lastUpdatedTextElement.style.color = '#555';
-            // Default prefix
-            this.currentPrefix = "Map Regions";
+            
+            this.currentPrefix = "Map Regions"; // Data source for this time
             this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: Fetching...`;
 
             L.DomEvent.on(this.refreshButton, 'click', L.DomEvent.stopPropagation);
@@ -135,27 +137,27 @@ document.addEventListener('DOMContentLoaded', function() {
             loadGeoJSON();
         },
         updateTime: function (dateObject, prefix = "Data") {
-            this.currentPrefix = prefix; // Store prefix in case button text changes
+            this.currentPrefix = prefix; 
             if (dateObject && dateObject instanceof Date && !isNaN(dateObject)) {
                 this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: ` + dateObject.toLocaleTimeString();
             } else if (dateObject === 'error') {
                 this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: Update Error`;
-            } else { // Covers null or other invalid values
+            } else { 
                 this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: N/A`;
             }
         },
         enableButton: function() {
             if (this.refreshButton) {
                 this.refreshButton.disabled = false;
-                this.refreshButton.innerHTML = '↻ Refresh';
+                this.refreshButton.innerHTML = '↻'; // Show icon
             }
         },
         setButtonLoading: function() {
             if (this.refreshButton) {
                 this.refreshButton.disabled = true;
-                this.refreshButton.innerHTML = 'Refreshing...';
+                // Icon remains visible but disabled
             }
-            // Display "Fetching..." for the specific data type while loading
+            // Text below indicates loading status for the "Map Regions" data
             this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: Fetching...`;
         }
     });
@@ -202,7 +204,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else { return "🤩: High probability of significant auroral substorms, potentially displaying a wide range of colors and dynamic activity overhead or in the northern sky."; }
     }
 
-    // --- MODIFIED: loadGeoJSON function ---
     async function loadGeoJSON() {
       if (isLoadingData) {
         console.log("Data load already in progress. Skipping this call.");
@@ -216,16 +217,14 @@ document.addEventListener('DOMContentLoaded', function() {
           loadingIndicator.textContent = 'Loading Data...';
       }
       if (refreshControlInstance) {
-        refreshControlInstance.setButtonLoading(); // This now shows "Map Regions: Fetching..."
+        refreshControlInstance.setButtonLoading(); // Shows "Map Regions: Fetching..."
       }
 
       let tnrScoreFetchSuccess = false;
-      let fetchedTnrScore = currentTnrScore; // Default to previous score if fetch fails
-      let fetchedTnrLastUpdated = new Date(currentTnrLastUpdated.getTime()); // Default to previous time
+      let fetchedTnrScore = currentTnrScore; 
+      let fetchedTnrLastUpdated = new Date(currentTnrLastUpdated.getTime());
 
-      let geoJsonSuccessfullyProcessed = false;
-      let latestGeoJsonFeatureTime = null;
-
+      let latestGeoJsonFeatureTime = null; // For the refresh control
 
       try {
         // --- 1. Fetch TNR Score (for aurora strength and banner) ---
@@ -236,7 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
           if (!tnrResponse.ok) {
             const errorText = await tnrResponse.text();
             console.error("Failed to fetch TNR score. Status:", tnrResponse.status, "Body:", errorText);
-            // TNR score fetch failure doesn't stop GeoJSON fetch, but tnrScoreFetchSuccess remains false.
           } else {
             const tnrDataJson = await tnrResponse.json();
             if (tnrDataJson && tnrDataJson.values && Array.isArray(tnrDataJson.values) && tnrDataJson.values.length > 0) {
@@ -257,10 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
           console.error("Error during TNR score fetch (inner catch):", tnrError);
         }
 
-        // Update global TNR state
         currentTnrScore = fetchedTnrScore;
         currentTnrLastUpdated = new Date(fetchedTnrLastUpdated.getTime());
-
         currentGlobalFillOpacity = calculateFillOpacityFromTnr(currentTnrScore);
         currentGlobalLineOpacity = calculateLineOpacity(currentGlobalFillOpacity);
 
@@ -291,13 +287,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const errStat = geoJsonMapResponse.status; let errBody = "GeoJSON err unreadable"; try{errBody = await geoJsonMapResponse.text()}catch(e){}
             console.error("GeoJSON fetch error:", errStat, errBody);
             if (refreshControlInstance) refreshControlInstance.updateTime('error', "Map Regions");
-            throw new Error('GeoJSON fetch failed: ' + errStat); // Propagate to main catch
+            throw new Error('GeoJSON fetch failed: ' + errStat);
         }
         const geoJsonData = await geoJsonMapResponse.json();
 
         if (geoJsonLayer) map.removeLayer(geoJsonLayer);
 
-        // --- Extract latest timestamp from GeoJSON features ---
         if (geoJsonData && geoJsonData.features && Array.isArray(geoJsonData.features)) {
             for (const feature of geoJsonData.features) {
                 if (feature.properties && feature.properties.geojson_last_updated) {
@@ -316,16 +311,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (latestGeoJsonFeatureTime) {
-            geoJsonSuccessfullyProcessed = true; // At least we found a timestamp
             if (refreshControlInstance) refreshControlInstance.updateTime(latestGeoJsonFeatureTime, "Map Regions");
         } else {
-             // No valid timestamp found in features, but GeoJSON was fetched.
             console.warn("No valid 'geojson_last_updated' timestamps found in GeoJSON features.");
-            if (refreshControlInstance) refreshControlInstance.updateTime(null, "Map Regions"); // Display N/A
+            if (refreshControlInstance) refreshControlInstance.updateTime(null, "Map Regions");
         }
-        // Note: geoJsonSuccessfullyProcessed is true if we got a timestamp.
-        // If geoJsonData was fetched but no timestamp, the map still loads, but time is N/A.
-
+        
         geoJsonLayer = L.geoJSON(geoJsonData, {
             style: feature => ({
                 color: getColorForScore(feature.properties.score), weight: 2, opacity: currentGlobalLineOpacity,
@@ -348,8 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const featureUpdateTime = new Date(feature.properties[featureLastUpdatedProperty]);
                             panelHTML += `(Region data updated: ${featureUpdateTime.toLocaleTimeString()})<br>`;
                         } catch (parseErr) { panelHTML += `(Region data update time unavailable)<br>`; }
-                    // The popup also shows the TNR index update time for clarity
-                    } else if (tnrScoreFetchSuccess) {
+                    } else if (tnrScoreFetchSuccess) { 
                         panelHTML += `(TNR Visibility Index updated: ${currentTnrLastUpdated.toLocaleTimeString()})<br>`;
                     } else {
                         panelHTML += `(TNR Visibility Index update N/A)<br>`;
@@ -379,10 +369,6 @@ document.addEventListener('DOMContentLoaded', function() {
             auroraStatusBannerElement.innerHTML = "<b>Map Data Error.</b> Please try again later.";
             auroraStatusBannerElement.className = 'warning';
         }
-        // If GeoJSON fetch failed, refreshControlInstance.updateTime('error', "Map Regions") was called above.
-        // If another error occurred after GeoJSON fetch but before its processing,
-        // the refresh control might show an older valid time or "Fetching..." if an error happened very early.
-        // It's generally handled.
       } finally {
         if(loadingIndicator) loadingIndicator.style.display = 'none';
         if (refreshControlInstance) {
@@ -411,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const textSpan = L.DomUtil.create('span', '', itemDiv); textSpan.innerHTML = item.text;
             });
             lastUpdatedElementInLegend = L.DomUtil.create('div', 'legend-last-updated', content);
-            lastUpdatedElementInLegend.textContent = 'Map display initializing...'; // Changed text slightly
+            lastUpdatedElementInLegend.textContent = 'Map display initializing...';
             L.DomEvent.on(toggleButton, 'click', function (e) { L.DomEvent.stopPropagation(e); if (L.DomUtil.hasClass(container, 'expanded')) { L.DomUtil.removeClass(container, 'expanded'); } else { L.DomUtil.addClass(container, 'expanded'); } });
             L.DomEvent.disableClickPropagation(container); L.DomEvent.disableScrollPropagation(container);
             return container;
