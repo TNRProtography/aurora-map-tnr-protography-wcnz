@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     new InfoControl().addTo(map);
 
-    // --- RefreshControl Definition (Icon Button) ---
+    // --- RefreshControl Definition (Icon Button with specific text) ---
     const RefreshControl = L.Control.extend({
         options: {
             position: 'topright'
@@ -107,9 +107,9 @@ document.addEventListener('DOMContentLoaded', function() {
             this.refreshButton.innerHTML = '↻'; // Unicode for refresh symbol
             this.refreshButton.style.backgroundColor = '#fff';
             this.refreshButton.style.border = '1px solid #ccc';
-            this.refreshButton.style.padding = '2px 6px'; // Adjusted padding
-            this.refreshButton.style.fontSize = '1.3em';   // Icon size
-            this.refreshButton.style.lineHeight = '1';    // Icon alignment
+            this.refreshButton.style.padding = '2px 6px';
+            this.refreshButton.style.fontSize = '1.3em';
+            this.refreshButton.style.lineHeight = '1';
             this.refreshButton.style.cursor = 'pointer';
             this.refreshButton.style.borderRadius = '3px';
             this.refreshButton.style.outline = 'none';
@@ -117,11 +117,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             this.lastUpdatedTextElement = L.DomUtil.create('div', 'last-updated-text', container);
             this.lastUpdatedTextElement.style.fontSize = '10px';
-            this.lastUpdatedTextElement.style.marginTop = '4px'; // Spacing
+            this.lastUpdatedTextElement.style.marginTop = '4px';
             this.lastUpdatedTextElement.style.color = '#555';
             
-            this.currentPrefix = "Map Regions"; // Data source for this time
-            this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: Fetching...`;
+            // Set the desired initial text
+            this.lastUpdatedTextElement.innerHTML = 'Data last updated: Fetching...';
 
             L.DomEvent.on(this.refreshButton, 'click', L.DomEvent.stopPropagation);
             L.DomEvent.on(this.refreshButton, 'click', L.DomEvent.preventDefault);
@@ -136,29 +136,29 @@ document.addEventListener('DOMContentLoaded', function() {
             this.setButtonLoading();
             loadGeoJSON();
         },
-        updateTime: function (dateObject, prefix = "Data") {
-            this.currentPrefix = prefix; 
+        // The 'prefix' argument is still accepted for consistency with how loadGeoJSON calls it,
+        // but it's not used in the displayed string.
+        updateTime: function (dateObject, _prefix) { 
             if (dateObject && dateObject instanceof Date && !isNaN(dateObject)) {
-                this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: ` + dateObject.toLocaleTimeString();
+                this.lastUpdatedTextElement.innerHTML = 'Data last updated: ' + dateObject.toLocaleTimeString();
             } else if (dateObject === 'error') {
-                this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: Update Error`;
+                this.lastUpdatedTextElement.innerHTML = 'Data last updated: Update Error';
             } else { 
-                this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: N/A`;
+                this.lastUpdatedTextElement.innerHTML = 'Data last updated: N/A';
             }
         },
         enableButton: function() {
             if (this.refreshButton) {
                 this.refreshButton.disabled = false;
-                this.refreshButton.innerHTML = '↻'; // Show icon
+                this.refreshButton.innerHTML = '↻';
             }
         },
         setButtonLoading: function() {
             if (this.refreshButton) {
                 this.refreshButton.disabled = true;
-                // Icon remains visible but disabled
             }
-            // Text below indicates loading status for the "Map Regions" data
-            this.lastUpdatedTextElement.innerHTML = `${this.currentPrefix}: Fetching...`;
+            // Set the specific loading text
+            this.lastUpdatedTextElement.innerHTML = 'Data last updated: Fetching...';
         }
     });
 
@@ -217,14 +217,14 @@ document.addEventListener('DOMContentLoaded', function() {
           loadingIndicator.textContent = 'Loading Data...';
       }
       if (refreshControlInstance) {
-        refreshControlInstance.setButtonLoading(); // Shows "Map Regions: Fetching..."
+        refreshControlInstance.setButtonLoading(); 
       }
 
       let tnrScoreFetchSuccess = false;
       let fetchedTnrScore = currentTnrScore; 
       let fetchedTnrLastUpdated = new Date(currentTnrLastUpdated.getTime());
 
-      let latestGeoJsonFeatureTime = null; // For the refresh control
+      let latestGeoJsonFeatureTime = null;
 
       try {
         // --- 1. Fetch TNR Score (for aurora strength and banner) ---
@@ -286,7 +286,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if(!geoJsonMapResponse.ok) {
             const errStat = geoJsonMapResponse.status; let errBody = "GeoJSON err unreadable"; try{errBody = await geoJsonMapResponse.text()}catch(e){}
             console.error("GeoJSON fetch error:", errStat, errBody);
-            if (refreshControlInstance) refreshControlInstance.updateTime('error', "Map Regions");
+            // The second argument "Map Regions" is just a conceptual tag now, not directly displayed
+            if (refreshControlInstance) refreshControlInstance.updateTime('error', "Map Regions"); 
             throw new Error('GeoJSON fetch failed: ' + errStat);
         }
         const geoJsonData = await geoJsonMapResponse.json();
