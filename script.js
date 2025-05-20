@@ -6,9 +6,13 @@ document.addEventListener('DOMContentLoaded', function() {
       maxZoom: 12,
       mapBounds: [[-55, 160], [-30, 185]],
       geoJsonUrl: 'https://aurora-map-nz.thenamesrock.workers.dev/',
-      tnrScoreUrl: 'https://tnr-aurora-forecast.thenamesrock.workers.dev/', // Source for the last updated time
-      refreshInterval: 300000 // 5 minutes
+      tnrScoreUrl: 'https://tnr-aurora-forecast.thenamesrock.workers.dev/',
+      // CONFIG.refreshInterval is no longer used for setInterval for data refresh
+      // as the page will reload every 2 minutes.
+      // refreshInterval: 300000 
     };
+
+    const PAGE_RELOAD_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
 
     const isTouchDevice = L.Browser.touch;
     const map = L.map('map', {
@@ -37,13 +41,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadingIndicator = document.getElementById('loading-indicator');
     let lastUpdatedElementInLegend = null;
     let refreshControlInstance = null;
-    let lastUpdatedTextControlInstance = null; // Instance for the new text control
+    let lastUpdatedTextControlInstance = null;
     let isLoadingData = false;
 
     let currentGlobalFillOpacity = 0.25;
     let currentGlobalLineOpacity = 0.1;
     let currentTnrScore = 0;
-    // currentTnrLastUpdated will hold the timestamp from the tnrScoreUrl
     let currentTnrLastUpdated = new Date();
 
     if (isTouchDevice && touchMessageElement) {
@@ -89,7 +92,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     new InfoControl().addTo(map);
 
-    // --- Simplified RefreshControl (Icon Button Only) ---
     const RefreshControl = L.Control.extend({
         options: {
             position: 'topright'
@@ -97,17 +99,17 @@ document.addEventListener('DOMContentLoaded', function() {
         onAdd: function (mapCtrl) {
             const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom-refresh');
             container.style.backgroundColor = 'rgba(255,255,255,0.8)';
-            container.style.padding = '5px'; // Container padding
+            container.style.padding = '5px';
             container.style.border = '1px solid rgba(0,0,0,0.2)';
             container.style.borderRadius = '4px';
             container.style.boxShadow = '0 1px 5px rgba(0,0,0,0.4)';
             this._map = mapCtrl;
 
             this.refreshButton = L.DomUtil.create('button', 'refresh-button-icon', container);
-            this.refreshButton.innerHTML = '↻'; // Unicode for refresh symbol
+            this.refreshButton.innerHTML = '↻';
             this.refreshButton.style.backgroundColor = '#fff';
             this.refreshButton.style.border = '1px solid #ccc';
-            this.refreshButton.style.padding = '2px 6px'; // Button's own padding
+            this.refreshButton.style.padding = '2px 6px';
             this.refreshButton.style.fontSize = '1.3em';
             this.refreshButton.style.lineHeight = '1';
             this.refreshButton.style.cursor = 'pointer';
@@ -124,9 +126,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return container;
         },
         _onRefreshClick: function () {
-            console.log("Refresh button clicked");
-            this.setButtonLoading();
-            loadGeoJSON(); // This will also trigger the LastUpdatedTextControl to show "Fetching..."
+            console.log("Refresh button clicked (manual data refresh)");
+            // loadGeoJSON will handle showing loading indicators and updating data
+            this.setButtonLoading(); // Visually disable button
+            loadGeoJSON();
         },
         enableButton: function() {
             if (this.refreshButton) {
@@ -140,24 +143,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- NEW: LastUpdatedTextControl (For "Data last updated:" text) ---
     const LastUpdatedTextControl = L.Control.extend({
         options: {
-            position: 'topright' // Will be stacked below other 'topright' controls if added after
+            position: 'topright'
         },
         onAdd: function (map) {
-            this._div = L.DomUtil.create('div', 'leaflet-control-last-updated'); // Custom class for styling
+            this._div = L.DomUtil.create('div', 'leaflet-control-last-updated');
             this._div.style.backgroundColor = 'rgba(255,255,255,0.8)';
             this._div.style.padding = '3px 6px';
             this._div.style.fontSize = '10px';
             this._div.style.color = '#333';
-            this._div.style.marginTop = '4px'; // Space below the refresh icon's container
+            this._div.style.marginTop = '4px';
             this._div.style.borderRadius = '3px';
-            this._div.style.boxShadow = '0 1px 5px rgba(0,0,0,0.2)'; // Optional consistent shadow
+            this._div.style.boxShadow = '0 1px 5px rgba(0,0,0,0.2)';
             this._div.style.textAlign = 'center';
-            // L.DomEvent.disableClickPropagation(this._div); // Not strictly necessary for non-interactive text
-            // L.DomEvent.disableScrollPropagation(this._div);
-            this.updateTime(null); // Initial state will be "Fetching..."
+            this.updateTime(null);
             return this._div;
         },
         updateTime: function (dateObject) {
@@ -165,20 +165,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 this._div.innerHTML = 'Data last updated: ' + dateObject.toLocaleTimeString();
             } else if (dateObject === 'error') {
                 this._div.innerHTML = 'Data last updated: Update Error';
-            } else { // Covers null, undefined, or initial call
+            } else {
                 this._div.innerHTML = 'Data last updated: Fetching...';
             }
         }
     });
 
-    // Instantiate and add controls
-    // The order of adding to 'topright' can influence visual stacking
     refreshControlInstance = new RefreshControl();
     refreshControlInstance.addTo(map);
 
     lastUpdatedTextControlInstance = new LastUpdatedTextControl();
     lastUpdatedTextControlInstance.addTo(map);
-
 
     L.control.zoom({ position: 'topleft' }).addTo(map);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -224,47 +221,43 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       isLoadingData = true;
-      console.log("--- loadGeoJSON: Start ---");
+      console.log("--- loadGeoJSON: Start (Data Refresh) ---");
 
+      // Explicitly show loading indicator for any data refresh (manual or initial)
       if(loadingIndicator) {
           loadingIndicator.style.display = 'block';
-          loadingIndicator.textContent = 'Loading Data...';
+          loadingIndicator.textContent = 'Refreshing Map Data...'; // More generic for manual refresh
       }
-      if (refreshControlInstance) {
+      if (refreshControlInstance) { // Ensure button is set to loading if not already
         refreshControlInstance.setButtonLoading(); 
       }
-      if (lastUpdatedTextControlInstance) { // Set text to "Fetching..." at start of load
-          lastUpdatedTextControlInstance.updateTime(null);
+      if (lastUpdatedTextControlInstance) {
+          lastUpdatedTextControlInstance.updateTime(null); // Shows "Fetching..."
       }
 
       let tnrScoreFetchSuccess = false;
-      // Default to previous values if fetch fails, to keep map somewhat functional
       let fetchedTnrScore = currentTnrScore; 
       let fetchedTnrLastUpdated = new Date(currentTnrLastUpdated.getTime());
 
       try {
-        // --- 1. Fetch TNR Score (this is now the source for "Data last updated") ---
         console.log("Fetching TNR score (for aurora index and last updated time)...");
-        if(loadingIndicator) loadingIndicator.textContent = 'Loading Aurora Index...';
+        // loadingIndicator text will be updated for specific steps if needed
+        // if(loadingIndicator) loadingIndicator.textContent = 'Loading Aurora Index...'; 
         try {
           const tnrResponse = await fetch(CONFIG.tnrScoreUrl + '?cachebust=' + new Date().getTime());
           if (!tnrResponse.ok) {
             const errorText = await tnrResponse.text();
             console.error("Failed to fetch TNR score. Status:", tnrResponse.status, "Body:", errorText);
-            // tnrScoreFetchSuccess remains false
           } else {
             const tnrDataJson = await tnrResponse.json();
             if (tnrDataJson && tnrDataJson.values && Array.isArray(tnrDataJson.values) && tnrDataJson.values.length > 0) {
-              // Assuming the first entry is the latest/relevant one, or if multiple, find the actual latest.
-              // Your current logic for multiple entries (reduce) is good if applicable.
-              // For simplicity, if it's always one or the first is latest:
               let latestEntry = tnrDataJson.values.reduce((latest, current) => new Date(current.lastUpdated) > new Date(latest.lastUpdated) ? current : latest);
               const parsedScore = parseFloat(latestEntry.value);
               if (isNaN(parsedScore)) {
                 console.error("Latest TNR score value is not a valid number:", latestEntry.value);
               } else {
                 fetchedTnrScore = parsedScore;
-                fetchedTnrLastUpdated = new Date(latestEntry.lastUpdated); // This is the key timestamp
+                fetchedTnrLastUpdated = new Date(latestEntry.lastUpdated);
                 tnrScoreFetchSuccess = true;
               }
             } else {
@@ -275,30 +268,27 @@ document.addEventListener('DOMContentLoaded', function() {
           console.error("Error during TNR score fetch (inner catch):", tnrError);
         }
 
-        // Update global TNR state
         currentTnrScore = fetchedTnrScore;
-        currentTnrLastUpdated = new Date(fetchedTnrLastUpdated.getTime()); // Ensure it's a new Date object
+        currentTnrLastUpdated = new Date(fetchedTnrLastUpdated.getTime());
 
-        // Update the "Data last updated" text display
         if (lastUpdatedTextControlInstance) {
             if (tnrScoreFetchSuccess) {
                 lastUpdatedTextControlInstance.updateTime(currentTnrLastUpdated);
             } else {
-                lastUpdatedTextControlInstance.updateTime('error'); // Or use null if you prefer "N/A"
+                lastUpdatedTextControlInstance.updateTime('error');
             }
         }
 
         currentGlobalFillOpacity = calculateFillOpacityFromTnr(currentTnrScore);
         currentGlobalLineOpacity = calculateLineOpacity(currentGlobalFillOpacity);
 
-        // Update Aurora Status Banner (uses TNR score and its timestamp)
         if (auroraStatusBannerElement) {
             if (currentTnrScore <= 0.01 && tnrScoreFetchSuccess) {
                 auroraStatusBannerElement.innerHTML = `The sun is up or the moon is too bright for any kind of potential aurora visibility.`;
                 auroraStatusBannerElement.className = 'warning';
             } else {
                 let bannerText = `<b>Potential Visibility (next 2 hrs):</b> ${currentTnrScore.toFixed(1)}% `;
-                if (tnrScoreFetchSuccess) { // This timestamp is the same as currentTnrLastUpdated
+                if (tnrScoreFetchSuccess) {
                     bannerText += `<span>(Index Updated: ${currentTnrLastUpdated.toLocaleTimeString()})</span>`;
                 } else {
                     bannerText += `<span>(Index Update Failed - Stale data from ${currentTnrLastUpdated.toLocaleTimeString()})</span>`;
@@ -309,7 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // --- 2. Fetch GeoJSON Map Data (for map regions) ---
         console.log("Fetching GeoJSON map data...");
         if(loadingIndicator) loadingIndicator.textContent = 'Loading Map Regions...';
         const geoJsonUrlWithCacheBust = CONFIG.geoJsonUrl + '?cachebust=' + new Date().getTime();
@@ -318,7 +307,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if(!geoJsonMapResponse.ok) {
             const errStat = geoJsonMapResponse.status; let errBody = "GeoJSON err unreadable"; try{errBody = await geoJsonMapResponse.text()}catch(e){}
             console.error("GeoJSON fetch error:", errStat, errBody);
-            // GeoJSON fetch failure doesn't change the "Data last updated" text, as that's from TNR score.
             throw new Error('GeoJSON fetch failed: ' + errStat);
         }
         const geoJsonData = await geoJsonMapResponse.json();
@@ -348,7 +336,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             panelHTML += `(Region polygon data updated: ${featureUpdateTime.toLocaleTimeString()})<br>`;
                         } catch (parseErr) { panelHTML += `(Region polygon data update time unavailable)<br>`; }
                     } 
-                    // Clarify that the TNR Index time is separate
                     if (tnrScoreFetchSuccess) { 
                         panelHTML += `(Overall Visibility Index updated: ${currentTnrLastUpdated.toLocaleTimeString()})<br>`;
                     } else {
@@ -379,7 +366,6 @@ document.addEventListener('DOMContentLoaded', function() {
             auroraStatusBannerElement.innerHTML = "<b>Map Data Error.</b> Please try again later.";
             auroraStatusBannerElement.className = 'warning';
         }
-        // If TNR score failed, lastUpdatedTextControlInstance was already set to 'error' or "N/A"
       } finally {
         if(loadingIndicator) loadingIndicator.style.display = 'none';
         if (refreshControlInstance) {
@@ -433,7 +419,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 0);
     });
 
-    loadGeoJSON();
-    setInterval(loadGeoJSON, CONFIG.refreshInterval);
+    loadGeoJSON(); // Initial data load on page ready
+
+    // --- Auto Page Reload every 2 minutes ---
+    // This will reload the entire HTML page.
+    // Note: This can be disruptive to user interaction.
+    console.log(`Page will automatically reload in ${PAGE_RELOAD_INTERVAL / 1000 / 60} minutes.`);
+    setTimeout(function() {
+        console.log("Auto-reloading page now...");
+        location.reload();
+    }, PAGE_RELOAD_INTERVAL);
+
+    // The previous setInterval for AJAX data refresh is removed as the page reload handles it.
+    // If you want AJAX refreshes *between* page reloads, you'd need a different strategy.
+    // setInterval(loadGeoJSON, CONFIG.refreshInterval); // This is now commented out/removed
 
 });
