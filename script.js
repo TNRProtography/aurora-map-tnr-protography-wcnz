@@ -32,6 +32,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const infoPanelContentElement = document.getElementById('info-panel-content');
     const infoPanelTitleElement = document.getElementById('info-panel-title');
     const infoPanelCloseButton = document.getElementById('info-panel-close-button');
+
+    // --- MODIFICATION: Center align the aurora status banner text ---
+    if (auroraStatusBannerElement) {
+        auroraStatusBannerElement.style.textAlign = 'center';
+    }
+    // --- END MODIFICATION ---
+
     let clickedOnFeature = false;
 
     let geoJsonLayer;
@@ -243,9 +250,8 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("Failed to fetch TNR score. Status:", tnrResponse.status, "Body:", errorText);
           } else {
             const tnrDataJson = await tnrResponse.json();
-            // --- MODIFIED: Use the first entry from tnrDataJson.values ---
             if (tnrDataJson && tnrDataJson.values && Array.isArray(tnrDataJson.values) && tnrDataJson.values.length > 0) {
-              const firstEntry = tnrDataJson.values[0]; // Get the first entry
+              const firstEntry = tnrDataJson.values[0];
               const parsedScore = parseFloat(firstEntry.value);
               if (isNaN(parsedScore)) {
                 console.error("First TNR score value is not a valid number:", firstEntry.value);
@@ -253,7 +259,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetchedTnrScore = parsedScore;
                 fetchedTnrLastUpdated = new Date(firstEntry.lastUpdated);
                 tnrScoreFetchSuccess = true;
-                console.log("Using first entry from TNR data:", firstEntry);
               }
             } else {
               console.error("TNR score data is not in the expected format or is empty.");
