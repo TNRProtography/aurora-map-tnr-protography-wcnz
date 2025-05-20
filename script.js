@@ -7,9 +7,6 @@ document.addEventListener('DOMContentLoaded', function() {
       mapBounds: [[-55, 160], [-30, 185]],
       geoJsonUrl: 'https://aurora-map-nz.thenamesrock.workers.dev/',
       tnrScoreUrl: 'https://tnr-aurora-forecast.thenamesrock.workers.dev/',
-      // CONFIG.refreshInterval is no longer used for setInterval for data refresh
-      // as the page will reload every 2 minutes.
-      // refreshInterval: 300000 
     };
 
     const PAGE_RELOAD_INTERVAL = 2 * 60 * 1000; // 2 minutes in milliseconds
@@ -127,8 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         _onRefreshClick: function () {
             console.log("Refresh button clicked (manual data refresh)");
-            // loadGeoJSON will handle showing loading indicators and updating data
-            this.setButtonLoading(); // Visually disable button
+            this.setButtonLoading();
             loadGeoJSON();
         },
         enableButton: function() {
@@ -223,16 +219,15 @@ document.addEventListener('DOMContentLoaded', function() {
       isLoadingData = true;
       console.log("--- loadGeoJSON: Start (Data Refresh) ---");
 
-      // Explicitly show loading indicator for any data refresh (manual or initial)
       if(loadingIndicator) {
           loadingIndicator.style.display = 'block';
-          loadingIndicator.textContent = 'Refreshing Map Data...'; // More generic for manual refresh
+          loadingIndicator.textContent = 'Refreshing Map Data...';
       }
-      if (refreshControlInstance) { // Ensure button is set to loading if not already
+      if (refreshControlInstance) {
         refreshControlInstance.setButtonLoading(); 
       }
       if (lastUpdatedTextControlInstance) {
-          lastUpdatedTextControlInstance.updateTime(null); // Shows "Fetching..."
+          lastUpdatedTextControlInstance.updateTime(null);
       }
 
       let tnrScoreFetchSuccess = false;
@@ -241,8 +236,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
       try {
         console.log("Fetching TNR score (for aurora index and last updated time)...");
-        // loadingIndicator text will be updated for specific steps if needed
-        // if(loadingIndicator) loadingIndicator.textContent = 'Loading Aurora Index...'; 
         try {
           const tnrResponse = await fetch(CONFIG.tnrScoreUrl + '?cachebust=' + new Date().getTime());
           if (!tnrResponse.ok) {
@@ -250,15 +243,17 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("Failed to fetch TNR score. Status:", tnrResponse.status, "Body:", errorText);
           } else {
             const tnrDataJson = await tnrResponse.json();
+            // --- MODIFIED: Use the first entry from tnrDataJson.values ---
             if (tnrDataJson && tnrDataJson.values && Array.isArray(tnrDataJson.values) && tnrDataJson.values.length > 0) {
-              let latestEntry = tnrDataJson.values.reduce((latest, current) => new Date(current.lastUpdated) > new Date(latest.lastUpdated) ? current : latest);
-              const parsedScore = parseFloat(latestEntry.value);
+              const firstEntry = tnrDataJson.values[0]; // Get the first entry
+              const parsedScore = parseFloat(firstEntry.value);
               if (isNaN(parsedScore)) {
-                console.error("Latest TNR score value is not a valid number:", latestEntry.value);
+                console.error("First TNR score value is not a valid number:", firstEntry.value);
               } else {
                 fetchedTnrScore = parsedScore;
-                fetchedTnrLastUpdated = new Date(latestEntry.lastUpdated);
+                fetchedTnrLastUpdated = new Date(firstEntry.lastUpdated);
                 tnrScoreFetchSuccess = true;
+                console.log("Using first entry from TNR data:", firstEntry);
               }
             } else {
               console.error("TNR score data is not in the expected format or is empty.");
@@ -419,19 +414,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 0);
     });
 
-    loadGeoJSON(); // Initial data load on page ready
+    loadGeoJSON();
 
-    // --- Auto Page Reload every 2 minutes ---
-    // This will reload the entire HTML page.
-    // Note: This can be disruptive to user interaction.
     console.log(`Page will automatically reload in ${PAGE_RELOAD_INTERVAL / 1000 / 60} minutes.`);
     setTimeout(function() {
         console.log("Auto-reloading page now...");
         location.reload();
     }, PAGE_RELOAD_INTERVAL);
-
-    // The previous setInterval for AJAX data refresh is removed as the page reload handles it.
-    // If you want AJAX refreshes *between* page reloads, you'd need a different strategy.
-    // setInterval(loadGeoJSON, CONFIG.refreshInterval); // This is now commented out/removed
 
 });
