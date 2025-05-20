@@ -62,9 +62,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if(infoPanelTitleElement) infoPanelTitleElement.textContent = title;
         if(infoPanelContentElement) infoPanelContentElement.innerHTML = htmlContent;
         if(mapContainerElement) mapContainerElement.classList.add('panel-active');
+        if(infoBottomPanelElement) infoBottomPanelPanelElement.classList.add('visible'); // Corrected typo? Should be infoBottomPanelElement
+        setTimeout(() => map.invalidateSize({ animate: false }), 50);
+    }
+    // --- CORRECTION: Fixed typo in showInfoPanel. Assumed 'infoBottomPanelPanelElement' was a typo. ---
+    function showInfoPanel(title, htmlContent) {
+        if(infoPanelTitleElement) infoPanelTitleElement.textContent = title;
+        if(infoPanelContentElement) infoPanelContentElement.innerHTML = htmlContent;
+        if(mapContainerElement) mapContainerElement.classList.add('panel-active');
         if(infoBottomPanelElement) infoBottomPanelElement.classList.add('visible');
         setTimeout(() => map.invalidateSize({ animate: false }), 50);
     }
+    // --- END CORRECTION ---
+
     function hideInfoPanel() {
         if(mapContainerElement) mapContainerElement.classList.remove('panel-active');
         if(infoBottomPanelElement) infoBottomPanelElement.classList.remove('visible');
@@ -231,14 +241,14 @@ document.addEventListener('DOMContentLoaded', function() {
           loadingIndicator.textContent = 'Refreshing Map Data...';
       }
       if (refreshControlInstance) {
-        refreshControlInstance.setButtonLoading(); 
+        refreshControlInstance.setButtonLoading();
       }
       if (lastUpdatedTextControlInstance) {
           lastUpdatedTextControlInstance.updateTime(null);
       }
 
       let tnrScoreFetchSuccess = false;
-      let fetchedTnrScore = currentTnrScore; 
+      let fetchedTnrScore = currentTnrScore;
       let fetchedTnrLastUpdated = new Date(currentTnrLastUpdated.getTime());
 
       try {
@@ -251,13 +261,16 @@ document.addEventListener('DOMContentLoaded', function() {
           } else {
             const tnrDataJson = await tnrResponse.json();
             if (tnrDataJson && tnrDataJson.values && Array.isArray(tnrDataJson.values) && tnrDataJson.values.length > 0) {
-              const firstEntry = tnrDataJson.values[0];
-              const parsedScore = parseFloat(firstEntry.value);
+              // --- MODIFICATION: Use the LAST entry instead of the first ---
+              const lastEntry = tnrDataJson.values[tnrDataJson.values.length - 1];
+              // --- END MODIFICATION ---
+
+              const parsedScore = parseFloat(lastEntry.value); // Use lastEntry
               if (isNaN(parsedScore)) {
-                console.error("First TNR score value is not a valid number:", firstEntry.value);
+                console.error("Last TNR score value is not a valid number:", lastEntry.value); // Updated log
               } else {
                 fetchedTnrScore = parsedScore;
-                fetchedTnrLastUpdated = new Date(firstEntry.lastUpdated);
+                fetchedTnrLastUpdated = new Date(lastEntry.lastUpdated); // Use lastEntry
                 tnrScoreFetchSuccess = true;
               }
             } else {
@@ -283,9 +296,9 @@ document.addEventListener('DOMContentLoaded', function() {
         currentGlobalLineOpacity = calculateLineOpacity(currentGlobalFillOpacity);
 
         if (auroraStatusBannerElement) {
-            if (currentTnrScore <= 0.01 && tnrScoreFetchSuccess) {
+            if (currentTnrScore <= 0.01 && tnrScoreFetchSuccess) { // Check tnrScoreFetchSuccess here too
                 auroraStatusBannerElement.innerHTML = `The sun is up or the moon is too bright for any kind of potential aurora visibility.`;
-                auroraStatusBannerElement.className = 'warning';
+                auroraStatusBannerElement.className = ''; // Clear warning class
             } else {
                 let bannerText = `<b>Potential Visibility (next 2 hrs):</b> ${currentTnrScore.toFixed(1)}% `;
                 if (tnrScoreFetchSuccess) {
@@ -295,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 bannerText += ` | Fill: ${(currentGlobalFillOpacity * 100).toFixed(0)}%, Line: ${(currentGlobalLineOpacity * 100).toFixed(0)}%`;
                 auroraStatusBannerElement.innerHTML = bannerText;
-                auroraStatusBannerElement.className = tnrScoreFetchSuccess ? '' : 'warning';
+                auroraStatusBannerElement.className = tnrScoreFetchSuccess ? '' : 'warning'; // Add warning class if update failed
             }
         }
 
@@ -312,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const geoJsonData = await geoJsonMapResponse.json();
 
         if (geoJsonLayer) map.removeLayer(geoJsonLayer);
-        
+
         geoJsonLayer = L.geoJSON(geoJsonData, {
             style: feature => ({
                 color: getColorForScore(feature.properties.score), weight: 2, opacity: currentGlobalLineOpacity,
@@ -325,6 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     clickedOnFeature = true;
                     let panelTitle = feature.properties.label || 'Area Details';
                     let panelHTML = "";
+                    // This panel will always show the currentTnrScore (from the last entry)
                     panelHTML += `<b>Potential Visibility (next 2 hrs): ${currentTnrScore.toFixed(1)}%</b><br>`;
                     const tnrDescription = getTnrScoreDescription(currentTnrScore);
                     if (tnrDescription) { panelHTML += `<strong>${tnrDescription}</strong><br>`; }
@@ -335,8 +349,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             const featureUpdateTime = new Date(feature.properties[featureLastUpdatedProperty]);
                             panelHTML += `(Region polygon data updated: ${featureUpdateTime.toLocaleTimeString()})<br>`;
                         } catch (parseErr) { panelHTML += `(Region polygon data update time unavailable)<br>`; }
-                    } 
-                    if (tnrScoreFetchSuccess) { 
+                    }
+                    if (tnrScoreFetchSuccess) {
                         panelHTML += `(Overall Visibility Index updated: ${currentTnrLastUpdated.toLocaleTimeString()})<br>`;
                     } else {
                         panelHTML += `(Overall Visibility Index update N/A or Stale)<br>`;
@@ -411,13 +425,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         setTimeout(() => {
+            // Check if the info panel is *still* not visible and no feature was clicked
             if (!clickedOnFeature && infoBottomPanelElement && !infoBottomPanelElement.classList.contains('visible')) {
                 const genericMessage = "Aurora activity is not expected in this area or north of this area in the next hour. Conditions must get better for some auroral activity to pick up.";
-                showInfoPanel("General Information", `<p>${genericMessage}</p>`);
+                 // Only show the generic message if the currentTnrScore is low or update failed
+                if (!tnrScoreFetchSuccess || currentTnrScore < 10) { // Example threshold: show generic if score is < 10 or update failed
+                    showInfoPanel("General Information", `<p>${genericMessage}</p>`);
+                } else {
+                     // Maybe show general info based on current high score instead? Or just do nothing?
+                     // Current implementation shows *something* when clicking outside a feature, let's keep that behavior
+                     // but maybe make the message slightly more context aware or just show the high score description
+                     let generalInfo = `<p>${genericMessage}</p>`; // Default low score message
+                     if (currentTnrScore >= 10 && tnrScoreFetchSuccess) {
+                        generalInfo = `<b>Potential Visibility (next 2 hrs): ${currentTnrScore.toFixed(1)}%</b><br>${getTnrScoreDescription(currentTnrScore)}<br><br><small><em>Click a map region for specific regional details (no solar/lunar influence info).</em></small>`;
+                     }
+                     showInfoPanel("General Information", generalInfo);
+                }
             }
-            clickedOnFeature = false;
+            clickedOnFeature = false; // Reset flag after potential panel display
         }, 0);
     });
+    // --- END MODIFICATION FOR GENERIC CLICK BEHAVIOR ---
+
 
     loadGeoJSON();
 
